@@ -3,7 +3,7 @@
 
 #include "parser.h"
 
-int is_builtin(const char *cmd_name);
+int is_builtin(const command_t *cmd);
 int execute_builtin(command_t *cmd);
 
 #endif

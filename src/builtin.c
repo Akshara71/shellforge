@@ -3,87 +3,97 @@
 #include <string.h>
 #include <unistd.h>
 #include <readline/history.h>
+
 #include "builtin.h"
 
-/* ---- cd : change directory ---- */
-static void builtin_cd(command_t *cmd)
+/* ---- cd ---- */
+static int builtin_cd(command_t *cmd)
 {
-    char *dir;
+    const char *directory;
 
     if (cmd->argc == 1)
     {
-        dir = getenv("HOME");
-        if (!dir)
+        directory = getenv("HOME");
+        if (directory == NULL)
         {
-            printf("cd: HOME not set\n");
-            return;
+            fprintf(stderr, "cd: HOME not set\n");
+            return -1;
         }
     }
     else if (cmd->argc == 2)
     {
-        dir = cmd->argv[1];
+        directory = cmd->argv[1];
     }
     else
     {
-        printf("cd: too many arguments\n");
-        return;
+        fprintf(stderr, "cd: too many arguments\n");
+        return -1;
     }
 
-    if (chdir(dir) != 0)
+    if (chdir(directory) != 0)
     {
         perror("cd");
+        return -1;
     }
+
+    return 0;
 }
 
-/* ---- pwd : print working directory ---- */
-static void builtin_pwd(command_t *cmd)
+/* ---- pwd ---- */
+static int builtin_pwd(command_t *cmd)
 {
+    char current_directory[4096];
+
     if (cmd->argc > 1)
     {
-        printf("pwd: too many arguments\n");
-        return;
+        fprintf(stderr, "pwd: too many arguments\n");
+        return -1;
     }
 
-    char buffer[1024];
-    if (getcwd(buffer, sizeof(buffer)) == NULL)
+    if (getcwd(current_directory, sizeof(current_directory)) == NULL)
     {
         perror("pwd");
-        return;
+        return -1;
     }
 
-    printf("%s\n", buffer);
+    printf("%s\n", current_directory);
+    return 0;
 }
 
-/* ---- echo : print arguments ---- */
-static void builtin_echo(command_t *cmd)
+/* ---- echo ---- */
+static int builtin_echo(command_t *cmd)
 {
     for (int i = 1; i < cmd->argc; i++)
     {
         printf("%s", cmd->argv[i]);
-        if (i != cmd->argc - 1)
+        if (i < cmd->argc - 1)
         {
             printf(" ");
         }
     }
     printf("\n");
+    return 0;
 }
 
-/* ---- exit : terminate the shell ---- */
+/* ---- exit ---- */
 static int builtin_exit(command_t *cmd)
 {
     if (cmd->argc > 1)
     {
-        printf("exit: too many arguments (ignored)\n");
+        fprintf(stderr, "exit: too many arguments\n");
+        return -1;
     }
-    return 1; /* signal main loop to stop */
+
+    return 1;
 }
 
-/* ---- history : bonus builtin, lists past commands ---- */
-static void builtin_history(void)
+/* ---- history (bonus builtin) ---- */
+static int builtin_history(void)
 {
     HIST_ENTRY **hist_list = history_list();
 
     printf("------ Command History ------\n");
+
     if (hist_list)
     {
         for (int i = 0; hist_list[i]; i++)
@@ -91,58 +101,41 @@ static void builtin_history(void)
             printf("%d  %s\n", i + 1, hist_list[i]->line);
         }
     }
+
     printf("------------------------------\n");
+    return 0;
 }
 
-int is_builtin(const char *cmd_name)
+/* ---- check if command is a builtin ---- */
+int is_builtin(const command_t *cmd)
 {
-    if (!cmd_name)
+    if (cmd == NULL || cmd->argc == 0)
     {
         return 0;
     }
 
-    return (strcmp(cmd_name, "cd") == 0 ||
-            strcmp(cmd_name, "pwd") == 0 ||
-            strcmp(cmd_name, "echo") == 0 ||
-            strcmp(cmd_name, "exit") == 0 ||
-            strcmp(cmd_name, "history") == 0);
-}
-
-int execute_builtin(command_t *cmd)
-{
-    if (cmd->argc == 0)
-    {
-        return 0;
-    }
-
-    if (strcmp(cmd->argv[0], "cd") == 0)
-    {
-        builtin_cd(cmd);
-        return 0;
-    }
-
-    if (strcmp(cmd->argv[0], "pwd") == 0)
-    {
-        builtin_pwd(cmd);
-        return 0;
-    }
-
-    if (strcmp(cmd->argv[0], "echo") == 0)
-    {
-        builtin_echo(cmd);
-        return 0;
-    }
-
-    if (strcmp(cmd->argv[0], "exit") == 0)
-    {
-        return builtin_exit(cmd);
-    }
-
-    if (strcmp(cmd->argv[0], "history") == 0)
-    {
-        builtin_history();
-        return 0;
-    }
+    if (strcmp(cmd->argv[0], "cd") == 0) return 1;
+    if (strcmp(cmd->argv[0], "pwd") == 0) return 1;
+    if (strcmp(cmd->argv[0], "echo") == 0) return 1;
+    if (strcmp(cmd->argv[0], "exit") == 0) return 1;
+    if (strcmp(cmd->argv[0], "history") == 0) return 1;
 
     return 0;
+}
+
+/* ---- execute the matching builtin ---- */
+int execute_builtin(command_t *cmd)
+{
+    if (cmd == NULL || cmd->argc == 0)
+    {
+        return -1;
+    }
+
+    if (strcmp(cmd->argv[0], "cd") == 0) return builtin_cd(cmd);
+    if (strcmp(cmd->argv[0], "pwd") == 0) return builtin_pwd(cmd);
+    if (strcmp(cmd->argv[0], "echo") == 0) return builtin_echo(cmd);
+    if (strcmp(cmd->argv[0], "exit") == 0) return builtin_exit(cmd);
+    if (strcmp(cmd->argv[0], "history") == 0) return builtin_history();
+
+    return -1;
 }

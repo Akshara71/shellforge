@@ -8,6 +8,7 @@
 #include "parser.h"
 #include "expand.h"
 #include "builtin.h"
+#include "executor.h"
 
 int main(void)
 {
@@ -56,16 +57,9 @@ int main(void)
                     continue;
                 }
 
-                if (is_builtin(cmd->argv[0]))
+                if (execute_command(cmd) == 1)
                 {
-                    if (execute_builtin(cmd) == 1)
-                    {
-                        should_exit = 1;
-                    }
-                }
-                else
-                {
-                    printf("shellforge: %s: external commands not supported yet\n", cmd->argv[0]);
+                    should_exit = 1;
                 }
             }
         }
