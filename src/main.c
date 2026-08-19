@@ -7,23 +7,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "expand.h"
-
-static void print_history(void)
-{
-    HIST_ENTRY **hist_list = history_list();
-
-    printf("------ Command History ------\n");
-
-    if (hist_list)
-    {
-        for (int i = 0; hist_list[i]; i++)
-        {
-            printf("%d  %s\n", i + 1, hist_list[i]->line);
-        }
-    }
-
-    printf("------------------------------\n");
-}
+#include "builtin.h"
 
 int main(void)
 {
@@ -35,6 +19,7 @@ int main(void)
     char *line;
     token_list_t tokens;
     pipeline_t pipeline;
+    int should_exit = 0;
 
     while (1)
     {
@@ -54,20 +39,6 @@ int main(void)
 
         add_history(line);
 
-        if (strcmp(line, "exit") == 0)
-        {
-            free(line);
-            printf("Exiting...\n");
-            break;
-        }
-
-        if (strcmp(line, "history") == 0)
-        {
-            print_history();
-            free(line);
-            continue;
-        }
-
         lexer(line, &tokens);
         token_print(&tokens);
 
@@ -75,9 +46,36 @@ int main(void)
         {
             expand_variables(&pipeline);
             pipeline_print(&pipeline);
+
+            for (int i = 0; i < pipeline.command_count; i++)
+            {
+                command_t *cmd = &pipeline.commands[i];
+
+                if (cmd->argc == 0)
+                {
+                    continue;
+                }
+
+                if (is_builtin(cmd->argv[0]))
+                {
+                    if (execute_builtin(cmd) == 1)
+                    {
+                        should_exit = 1;
+                    }
+                }
+                else
+                {
+                    printf("shellforge: %s: external commands not supported yet\n", cmd->argv[0]);
+                }
+            }
         }
 
         free(line);
+
+        if (should_exit)
+        {
+            break;
+        }
     }
 
     return 0;
