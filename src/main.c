@@ -5,6 +5,8 @@
 #include <readline/readline.h>
 #include "token.h"
 #include "lexer.h"
+#include "parser.h"
+#include "expand.h"
 
 static void print_history(void)
 {
@@ -32,6 +34,7 @@ int main(void)
 
     char *line;
     token_list_t tokens;
+    pipeline_t pipeline;
 
     while (1)
     {
@@ -67,6 +70,12 @@ int main(void)
 
         lexer(line, &tokens);
         token_print(&tokens);
+
+        if (parse(&tokens, &pipeline))
+        {
+            expand_variables(&pipeline);
+            pipeline_print(&pipeline);
+        }
 
         free(line);
     }
