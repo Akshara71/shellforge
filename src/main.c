@@ -16,6 +16,9 @@ int main(void)
     printf("     Shellforge\n");
     printf(" A Unix Style Shell written in C\n");
     printf("=====================================\n");
+    printf(" Name : V. AKSHARA\n");
+    printf(" ID   : 2500031100\n");
+    printf("=====================================\n");
 
     char *line;
     token_list_t tokens;
@@ -48,19 +51,9 @@ int main(void)
             expand_variables(&pipeline);
             pipeline_print(&pipeline);
 
-            for (int i = 0; i < pipeline.command_count; i++)
+            if (execute_pipeline(&pipeline) == 1)
             {
-                command_t *cmd = &pipeline.commands[i];
-
-                if (cmd->argc == 0)
-                {
-                    continue;
-                }
-
-                if (execute_command(cmd) == 1)
-                {
-                    should_exit = 1;
-                }
+                should_exit = 1;
             }
         }
 
