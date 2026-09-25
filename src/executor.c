@@ -1,12 +1,41 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
 #include "executor.h"
 #include "builtin.h"
+
+/* ---- SIGCHLD handler: reaps finished background children so they
+   never become zombies, without the shell having to wait() for them ---- */
+static void sigchld_handler(int sig)
+{
+    int saved_errno = errno;
+    (void)sig;
+
+    while (waitpid(-1, NULL, WNOHANG) > 0)
+    {
+        /* Reap finished background children */
+    }
+
+    errno = saved_errno;
+}
+
+void setup_background_handler(void)
+{
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sigchld_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    sigaction(SIGCHLD, &sa, NULL);
+}
 
 /* Apply this command's < input / > output / >> append redirection
    to the CURRENT process. Must be called inside a child, before execvp(). */
@@ -39,8 +68,7 @@ static void apply_redirection(command_t *cmd)
 }
 
 /* Execute a single command (no pipeline). Builtins with no redirection
-   run directly in the shell's own process; builtins with redirection,
-   and all external commands, run in a forked child. */
+   run directly in the shell's own process; everything else forks. */
 int execute_command(command_t *cmd)
 {
     pid_t pid;
@@ -51,7 +79,7 @@ int execute_command(command_t *cmd)
         return -1;
     }
 
-    if (is_builtin(cmd))
+    if (is_builtin(cmd) && !cmd->background)
     {
         /* No redirection -> run directly (needed so cd/exit affect the real shell) */
         if (cmd->input[0] == '\0' && cmd->output[0] == '\0')
@@ -94,7 +122,24 @@ int execute_command(command_t *cmd)
 
     if (pid == 0)
     {
+        /* Background jobs shouldn't read from the terminal */
+        if (cmd->background)
+        {
+            int null_fd = open("/dev/null", O_RDONLY);
+            if (null_fd >= 0)
+            {
+                dup2(null_fd, STDIN_FILENO);
+                close(null_fd);
+            }
+        }
+
         apply_redirection(cmd);
+
+        if (is_builtin(cmd))
+        {
+            int result = execute_builtin(cmd);
+            _exit(result < 0 ? 1 : result);
+        }
 
         char *args[MAX_ARGS + 1];
         for (int i = 0; i < cmd->argc; i++)
@@ -107,6 +152,13 @@ int execute_command(command_t *cmd)
 
         perror("Shellforge");
         _exit(127);
+    }
+
+    /* ---- PARENT ---- */
+    if (cmd->background)
+    {
+        printf("[Background PID: %d]\n", pid);
+        return 0; /* Do not wait -> shell returns to prompt immediately */
     }
 
     if (waitpid(pid, &status, 0) == -1)
@@ -130,7 +182,8 @@ int execute_command(command_t *cmd)
 }
 
 /* Execute a full pipeline of one or more commands, connecting them
-   with real pipe()s so data actually flows between processes. */
+   with real pipe()s. If the LAST command has the & flag, the whole
+   pipeline runs in the background and the shell does not wait. */
 int execute_pipeline(pipeline_t *pipeline)
 {
     if (pipeline == NULL || pipeline->command_count == 0)
@@ -139,6 +192,7 @@ int execute_pipeline(pipeline_t *pipeline)
     }
 
     int command_count = pipeline->command_count;
+    int background = pipeline->commands[command_count - 1].background;
 
     /* Single command -> no piping needed, just run it directly */
     if (command_count == 1)
@@ -183,6 +237,19 @@ int execute_pipeline(pipeline_t *pipeline)
             if (has_next_pipe)
             {
                 dup2(pipefd[1], STDOUT_FILENO);
+            }
+
+            /* Only the first stage of a background pipeline needs its
+               stdin cut off from the terminal (later stages already
+               read from the previous pipe, not the terminal) */
+            if (background && i == 0 && previous_read == -1)
+            {
+                int null_fd = open("/dev/null", O_RDONLY);
+                if (null_fd >= 0)
+                {
+                    dup2(null_fd, STDIN_FILENO);
+                    close(null_fd);
+                }
             }
 
             /* Explicit < / > / >> overrides the pipe wiring if set */
@@ -235,6 +302,12 @@ int execute_pipeline(pipeline_t *pipeline)
         {
             previous_read = -1;
         }
+    }
+
+    if (background)
+    {
+        printf("[Background Pipeline PID: %d]\n", pids[0]);
+        return 0; /* Do not wait -> SIGCHLD handler reaps them later */
     }
 
     int status;

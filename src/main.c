@@ -19,6 +19,7 @@ int main(void)
     printf(" Name : V. AKSHARA\n");
     printf(" ID   : 2500031100\n");
     printf("=====================================\n");
+    setup_background_handler();
 
     char *line;
     token_list_t tokens;
