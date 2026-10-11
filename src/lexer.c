@@ -60,6 +60,7 @@ void lexer(const char *input, token_list_t *list)
 
         char word[MAX_TOKEN_LEN];
         int j = 0;
+        int too_long = 0;    /* NEW: set when a word does not fit in word[] */
 
         while (input[i] != '\0' &&
                !isspace((unsigned char)input[i]) &&
@@ -74,6 +75,7 @@ void lexer(const char *input, token_list_t *list)
                 while (input[i] != '\0' && input[i] != '\'')
                 {
                     if (j < MAX_TOKEN_LEN - 1) word[j++] = input[i];
+                    else too_long = 1;
                     i++;
                 }
                 if (input[i] == '\'')
@@ -97,11 +99,13 @@ void lexer(const char *input, token_list_t *list)
                     {
                         i++;
                         if (j < MAX_TOKEN_LEN - 1) word[j++] = input[i];
+                        else too_long = 1;
                         i++;
                     }
                     else
                     {
                         if (j < MAX_TOKEN_LEN - 1) word[j++] = input[i];
+                        else too_long = 1;
                         i++;
                     }
                 }
@@ -123,13 +127,26 @@ void lexer(const char *input, token_list_t *list)
                 if (input[i] != '\0')
                 {
                     if (j < MAX_TOKEN_LEN - 1) word[j++] = input[i];
+                    else too_long = 1;
                     i++;
                 }
                 continue;
             }
 
             if (j < MAX_TOKEN_LEN - 1) word[j++] = c;
+            else too_long = 1;
             i++;
+        }
+
+        /* NEW: never cut a word silently. Reject the whole line instead. */
+        if (too_long)
+        {
+            fprintf(stderr,
+                    "Lexer Error : Word too long (maximum %d characters)\n",
+                    MAX_TOKEN_LEN - 1);
+            token_list_init(list);
+            token_add(list, TOKEN_END, "END");
+            return;
         }
 
         word[j] = '\0';

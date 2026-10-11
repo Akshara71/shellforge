@@ -2,7 +2,9 @@
 #define TOKEN_H
 
 #define MAX_TOKENS 64
-#define MAX_TOKEN_LEN 256
+/* Longest word is MAX_TOKEN_LEN - 1 characters. 1024 lets FileGuard
+ * receive its full 511-character text (see src/fileguard.c). */
+#define MAX_TOKEN_LEN 1024
 
 typedef enum {
     TOKEN_WORD,
