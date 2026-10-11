@@ -1,10 +1,30 @@
+#define _POSIX_C_SOURCE 200809L
+
+/*
+ * =========================================================
+ * Name    : V. AKSHARA
+ * ID      : 2500031100
+ * File    : builtin.c
+ * Project : Shellforge - A Unix Style Shell in C
+ * =========================================================
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include <readline/history.h>
 
 #include "builtin.h"
+#include "jobs.h"
+
+__attribute__((constructor))
+static void print_author(void)
+{
+    printf("Developed by V. Akshara, ID: 2500031100\n");
+}
 
 /* ---- cd ---- */
 static int builtin_cd(command_t *cmd)
@@ -106,6 +126,85 @@ static int builtin_history(void)
     return 0;
 }
 
+/* ---- jobs : list background jobs ---- */
+static int builtin_jobs(command_t *cmd)
+{
+    (void)cmd;
+    jobs_print();
+    return 0;
+}
+
+/* ---- bg : resume a stopped job in the background ---- */
+static int builtin_bg(command_t *cmd)
+{
+    if (cmd->argc < 2)
+    {
+        fprintf(stderr, "bg: usage: bg <job_id>\n");
+        return -1;
+    }
+
+    int job_id = atoi(cmd->argv[1]);
+    job_t *job = job_find(job_id);
+
+    if (!job)
+    {
+        fprintf(stderr, "bg: job %d not found\n", job_id);
+        return -1;
+    }
+
+    kill(-job->pgid, SIGCONT);
+    job_continue(job->pgid);
+    printf("[%d] %s &\n", job->job_id, job->command);
+
+    return 0;
+}
+
+/* ---- fg : bring a job to the foreground and wait for it ---- */
+static int builtin_fg(command_t *cmd)
+{
+    if (cmd->argc < 2)
+    {
+        fprintf(stderr, "fg: usage: fg <job_id>\n");
+        return -1;
+    }
+
+    int job_id = atoi(cmd->argv[1]);
+    job_t *job = job_find(job_id);
+
+    if (!job)
+    {
+        fprintf(stderr, "fg: job %d not found\n", job_id);
+        return -1;
+    }
+
+    printf("%s\n", job->command);
+
+    if (job->state == JOB_STOPPED)
+    {
+        kill(-job->pgid, SIGCONT);
+    }
+
+    job_continue(job->pgid);
+
+    int status;
+    tcsetpgrp(STDIN_FILENO, job->pgid);
+    waitpid(-job->pgid, &status, WUNTRACED);
+    tcsetpgrp(STDIN_FILENO, getpgrp());
+
+    if (WIFSTOPPED(status))
+    {
+        job_stop(job->pgid);
+        printf("\n[%d]  Stopped  %s\n", job->job_id, job->command);
+    }
+    else
+    {
+        job_done(job->pgid);
+        job_remove(job->job_id);
+    }
+
+    return 0;
+}
+
 /* ---- check if command is a builtin ---- */
 int is_builtin(const command_t *cmd)
 {
@@ -119,6 +218,9 @@ int is_builtin(const command_t *cmd)
     if (strcmp(cmd->argv[0], "echo") == 0) return 1;
     if (strcmp(cmd->argv[0], "exit") == 0) return 1;
     if (strcmp(cmd->argv[0], "history") == 0) return 1;
+    if (strcmp(cmd->argv[0], "jobs") == 0) return 1;
+    if (strcmp(cmd->argv[0], "fg") == 0) return 1;
+    if (strcmp(cmd->argv[0], "bg") == 0) return 1;
 
     return 0;
 }
@@ -136,6 +238,9 @@ int execute_builtin(command_t *cmd)
     if (strcmp(cmd->argv[0], "echo") == 0) return builtin_echo(cmd);
     if (strcmp(cmd->argv[0], "exit") == 0) return builtin_exit(cmd);
     if (strcmp(cmd->argv[0], "history") == 0) return builtin_history();
+    if (strcmp(cmd->argv[0], "jobs") == 0) return builtin_jobs(cmd);
+    if (strcmp(cmd->argv[0], "fg") == 0) return builtin_fg(cmd);
+    if (strcmp(cmd->argv[0], "bg") == 0) return builtin_bg(cmd);
 
     return -1;
 }

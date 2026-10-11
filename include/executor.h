@@ -4,6 +4,7 @@
 #include "parser.h"
 
 void setup_background_handler(void);
+void setup_job_control(void);
 int execute_command(command_t *cmd);
 int execute_pipeline(pipeline_t *pipeline);
 

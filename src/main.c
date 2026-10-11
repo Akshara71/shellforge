@@ -9,6 +9,7 @@
 #include "expand.h"
 #include "builtin.h"
 #include "executor.h"
+#include "jobs.h"
 
 int main(void)
 {
@@ -19,7 +20,10 @@ int main(void)
     printf(" Name : V. AKSHARA\n");
     printf(" ID   : 2500031100\n");
     printf("=====================================\n");
+
+    setup_job_control();
     setup_background_handler();
+    jobs_init();
 
     char *line;
     token_list_t tokens;
