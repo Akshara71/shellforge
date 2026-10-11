@@ -49,12 +49,20 @@ int main(void)
         add_history(line);
 
         lexer(line, &tokens);
-        token_print(&tokens);
+
+        if (g_debug_output)          /* NEW: "debug off" hides the tables */
+        {
+            token_print(&tokens);
+        }
 
         if (parse(&tokens, &pipeline))
         {
             expand_variables(&pipeline);
-            pipeline_print(&pipeline);
+
+            if (g_debug_output)      /* NEW */
+            {
+                pipeline_print(&pipeline);
+            }
 
             if (execute_pipeline(&pipeline) == 1)
             {

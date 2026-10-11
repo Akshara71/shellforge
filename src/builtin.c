@@ -19,6 +19,10 @@
 
 #include "builtin.h"
 #include "jobs.h"
+#include "fileguard.h"   /* NEW: FileGuard storage commands */
+
+/* NEW: controls whether main.c prints the TOKENS / PIPELINE tables */
+int g_debug_output = 1;
 
 __attribute__((constructor))
 static void print_author(void)
@@ -205,6 +209,54 @@ static int builtin_fg(command_t *cmd)
     return 0;
 }
 
+/* ---- NEW: fileguard : FileGuard storage commands ---- */
+static int builtin_fileguard(command_t *cmd)
+{
+    /* Copy the argument pointers into a plain argv array for FileGuard */
+    char *args[cmd->argc + 1];
+    int result;
+
+    for (int i = 0; i < cmd->argc; i++)
+    {
+        args[i] = cmd->argv[i];
+    }
+    args[cmd->argc] = NULL;
+
+    result = fileguard_run(cmd->argc, args);
+
+    /* Flush now: a forked builtin ends with _exit(), which does not flush */
+    fflush(stdout);
+    fflush(stderr);
+
+    /* Return 0 or -1 only. Never 1, because 1 means "exit the shell". */
+    return (result == 0) ? 0 : -1;
+}
+
+/* ---- NEW: debug : turn the TOKENS / PIPELINE tables on or off ---- */
+static int builtin_debug(command_t *cmd)
+{
+    if (cmd->argc == 1)
+    {
+        printf("debug output is %s\n", g_debug_output ? "on" : "off");
+        return 0;
+    }
+
+    if (cmd->argc == 2 && strcmp(cmd->argv[1], "on") == 0)
+    {
+        g_debug_output = 1;
+        return 0;
+    }
+
+    if (cmd->argc == 2 && strcmp(cmd->argv[1], "off") == 0)
+    {
+        g_debug_output = 0;
+        return 0;
+    }
+
+    fprintf(stderr, "debug: usage: debug [on|off]\n");
+    return -1;
+}
+
 /* ---- check if command is a builtin ---- */
 int is_builtin(const command_t *cmd)
 {
@@ -221,6 +273,8 @@ int is_builtin(const command_t *cmd)
     if (strcmp(cmd->argv[0], "jobs") == 0) return 1;
     if (strcmp(cmd->argv[0], "fg") == 0) return 1;
     if (strcmp(cmd->argv[0], "bg") == 0) return 1;
+    if (strcmp(cmd->argv[0], "fileguard") == 0) return 1;   /* NEW */
+    if (strcmp(cmd->argv[0], "debug") == 0) return 1;       /* NEW */
 
     return 0;
 }
@@ -241,6 +295,8 @@ int execute_builtin(command_t *cmd)
     if (strcmp(cmd->argv[0], "jobs") == 0) return builtin_jobs(cmd);
     if (strcmp(cmd->argv[0], "fg") == 0) return builtin_fg(cmd);
     if (strcmp(cmd->argv[0], "bg") == 0) return builtin_bg(cmd);
+    if (strcmp(cmd->argv[0], "fileguard") == 0) return builtin_fileguard(cmd);   /* NEW */
+    if (strcmp(cmd->argv[0], "debug") == 0) return builtin_debug(cmd);           /* NEW */
 
     return -1;
 }
