@@ -1,7 +1,7 @@
 /*
  * disk.h - Virtual Disk Manager interface (FileGuard Core Module-I)
  *
- * A "virtual disk" is an ordinary file in the data/ folder.
+ * A "virtual disk" is an ordinary file in the data folder.
  * Layout of every disk file:
  *   Block 0          : header (identifies the disk)
  *   Blocks 1..1024   : data blocks
@@ -15,7 +15,8 @@
 #define NUM_DISKS         4          /* number of virtual disks          */
 #define BLOCK_SIZE        512        /* bytes per block                  */
 #define DISK_DATA_BLOCKS  1024       /* data blocks per disk (no header) */
-#define DISK_DIR          "data"     /* folder holding the .img files    */
+#define DISK_DIR          "data"     /* default data folder              */
+#define DISK_PATH_MAX     512        /* size of path buffers             */
 #define DISK_MAGIC        0x46475244u /* identifies a FileGuard disk     */
 
 /* Return codes used by the disk functions */
@@ -34,7 +35,13 @@ typedef struct {
     uint32_t data_blocks;  /* number of data blocks (excl. header)   */
 } DiskHeader;
 
-/* Build the file path for a disk, e.g. disk 0 -> "data/disk1.img" */
+/* Choose the folder that holds the .img files (default: "data") */
+void disk_set_data_dir(const char *dir);
+
+/* The folder currently used for the .img files */
+const char *disk_get_data_dir(void);
+
+/* Build the file path for a disk, e.g. disk 0 -> "<data dir>/disk1.img" */
 void disk_path(int disk_id, char *buf, size_t size);
 
 /* Create (or recreate) a disk file and write its header */

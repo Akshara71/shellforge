@@ -14,15 +14,28 @@
 #include <sys/stat.h>
 #include "disk.h"
 
+/* Folder that holds the disk image files (can be changed at run time) */
+static char g_data_dir[400] = DISK_DIR;
+
+void disk_set_data_dir(const char *dir)
+{
+    snprintf(g_data_dir, sizeof(g_data_dir), "%s", dir);
+}
+
+const char *disk_get_data_dir(void)
+{
+    return g_data_dir;
+}
+
 void disk_path(int disk_id, char *buf, size_t size)
 {
     /* disk_id 0 -> disk1.img, so file names are 1-based */
-    snprintf(buf, size, "%s/disk%d.img", DISK_DIR, disk_id + 1);
+    snprintf(buf, size, "%s/disk%d.img", g_data_dir, disk_id + 1);
 }
 
 int disk_create(int disk_id)
 {
-    char path[128];
+    char path[DISK_PATH_MAX];
     unsigned char block[BLOCK_SIZE];
     DiskHeader hdr;
     off_t total_size;
@@ -69,7 +82,7 @@ int disk_create(int disk_id)
 
 int disk_read_header(int disk_id, DiskHeader *hdr)
 {
-    char path[128];
+    char path[DISK_PATH_MAX];
     unsigned char block[BLOCK_SIZE];
     ssize_t n;
     int fd;
@@ -97,7 +110,7 @@ int disk_read_header(int disk_id, DiskHeader *hdr)
 
 int disk_write_block(int disk_id, uint32_t block_no, const void *buf)
 {
-    char path[128];
+    char path[DISK_PATH_MAX];
     off_t offset;
     ssize_t n;
     int fd;
@@ -120,7 +133,7 @@ int disk_write_block(int disk_id, uint32_t block_no, const void *buf)
 
 int disk_read_block(int disk_id, uint32_t block_no, void *buf)
 {
-    char path[128];
+    char path[DISK_PATH_MAX];
     off_t offset;
     ssize_t n;
     int fd;
