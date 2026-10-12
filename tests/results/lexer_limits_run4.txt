@@ -1,0 +1,20 @@
+==============================================================
+ Shellforge word-length limit tests
+ Date : Mon Oct 12 09:01:07 UTC 2026
+==============================================================
+
+--- Shell word limit (1023 characters) ---
+PASS: a 1023-character word is passed through unchanged
+PASS: a 1024-character word is rejected with an error
+PASS: the rejected command printed nothing (no cut-off text)
+PASS: shell is still alive after the rejected line
+
+--- FileGuard text through the shell ---
+PASS: 511 characters are accepted
+PASS: block 31 reads back all 511 characters (2 spaces + 511 = 513)
+PASS: an over-long text is rejected by the lexer
+PASS: the rejected write stored nothing (block still empty)
+
+==============================================================
+ Passed: 8    Failed: 0
+==============================================================

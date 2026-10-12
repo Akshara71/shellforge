@@ -1,0 +1,128 @@
+==============================================================
+ FileGuard failure, rebuild and verify test run
+ Date    : Mon Oct 12 09:01:29 UTC 2026
+ Kernel  : 6.18.33.1-microsoft-standard-WSL2
+ GCC     : gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+ Binary  : /home/akshara/shellforge/shellforge
+==============================================================
+
+--- fail command ---
+PASS: fail before init is refused
+PASS: fail reports the simulated failure
+PASS: the image file of Disk 2 is really gone (0 = gone)
+PASS: status shows the array DEGRADED
+PASS: failing the same disk twice is refused
+PASS: bad disk numbers (5, 0, abc) are rejected
+PASS: fail without a disk number shows usage
+PASS: shell is still alive
+PASS: failing a RAID-0 disk warns that data is lost
+PASS: RAID-1: failing an unused disk does not affect the mirror
+PASS: RAID-1: failing one mirror disk degrades it
+PASS: RAID-1: failing both mirror disks warns
+PASS: RAID-5: a second failure warns that recovery is impossible
+
+--- RAID-5: rebuild each disk, restoring the exact original image ---
+PASS: Disk 1: rebuild reports the RAID-5 volume
+PASS: Disk 1: all 1024 blocks were compared and match
+PASS: Disk 1: it is ONLINE again
+PASS: Disk 1: the automatic full verify says CONSISTENT
+PASS: Disk 1: array is HEALTHY again
+PASS: Disk 1: rebuilt image is byte-for-byte identical to the original
+PASS: Disk 1: all 24 blocks read back correctly after the rebuild
+PASS: Disk 2: rebuild reports the RAID-5 volume
+PASS: Disk 2: all 1024 blocks were compared and match
+PASS: Disk 2: it is ONLINE again
+PASS: Disk 2: the automatic full verify says CONSISTENT
+PASS: Disk 2: array is HEALTHY again
+PASS: Disk 2: rebuilt image is byte-for-byte identical to the original
+PASS: Disk 2: all 24 blocks read back correctly after the rebuild
+PASS: Disk 3: rebuild reports the RAID-5 volume
+PASS: Disk 3: all 1024 blocks were compared and match
+PASS: Disk 3: it is ONLINE again
+PASS: Disk 3: the automatic full verify says CONSISTENT
+PASS: Disk 3: array is HEALTHY again
+PASS: Disk 3: rebuilt image is byte-for-byte identical to the original
+PASS: Disk 3: all 24 blocks read back correctly after the rebuild
+PASS: Disk 4: rebuild reports the RAID-5 volume
+PASS: Disk 4: all 1024 blocks were compared and match
+PASS: Disk 4: it is ONLINE again
+PASS: Disk 4: the automatic full verify says CONSISTENT
+PASS: Disk 4: array is HEALTHY again
+PASS: Disk 4: rebuilt image is byte-for-byte identical to the original
+PASS: Disk 4: all 24 blocks read back correctly after the rebuild
+
+--- RAID-5: data written while a disk was down survives the rebuild ---
+PASS: Disk 1: array is HEALTHY after the rebuild
+PASS: Disk 1: verify says CONSISTENT
+PASS: Disk 1: blocks written while degraded read back correctly
+PASS: Disk 1: stripes 0-7 pass the independent parity check in bash
+PASS: Disk 2: array is HEALTHY after the rebuild
+PASS: Disk 2: verify says CONSISTENT
+PASS: Disk 2: blocks written while degraded read back correctly
+PASS: Disk 2: stripes 0-7 pass the independent parity check in bash
+PASS: Disk 3: array is HEALTHY after the rebuild
+PASS: Disk 3: verify says CONSISTENT
+PASS: Disk 3: blocks written while degraded read back correctly
+PASS: Disk 3: stripes 0-7 pass the independent parity check in bash
+PASS: Disk 4: array is HEALTHY after the rebuild
+PASS: Disk 4: verify says CONSISTENT
+PASS: Disk 4: blocks written while degraded read back correctly
+PASS: Disk 4: stripes 0-7 pass the independent parity check in bash
+
+--- RAID-5: a damaged (CORRUPT) disk can be rebuilt too ---
+PASS: the damaged disk is shown as CORRUPT before the rebuild
+PASS: the rebuild accepts it and succeeds
+PASS: the rebuilt image is identical to the original
+
+--- RAID-1: rebuild a mirror disk ---
+PASS: Disk 1: rebuild reports the RAID-1 volume
+PASS: Disk 1: all 1024 blocks match
+PASS: Disk 1: the automatic full verify says CONSISTENT
+PASS: Disk 1: mirror is HEALTHY again
+PASS: Disk 1: rebuilt image is byte-for-byte identical to the original
+PASS: Disk 1: copies are identical after rebuilding with newer data
+PASS: Disk 1: blocks written while degraded read back correctly
+PASS: Disk 2: rebuild reports the RAID-1 volume
+PASS: Disk 2: all 1024 blocks match
+PASS: Disk 2: the automatic full verify says CONSISTENT
+PASS: Disk 2: mirror is HEALTHY again
+PASS: Disk 2: rebuilt image is byte-for-byte identical to the original
+PASS: Disk 2: copies are identical after rebuilding with newer data
+PASS: Disk 2: blocks written while degraded read back correctly
+PASS: an unused mirror disk is simply recreated
+PASS: the mirror is still HEALTHY
+PASS: with both mirror disks gone, rebuild is refused
+
+--- Rebuild is refused when it cannot be done safely ---
+PASS: rebuild before init is refused
+PASS: rebuilding a healthy disk is refused
+PASS: and the data is untouched
+PASS: RAID-5 with two failed disks cannot be rebuilt
+PASS: the refused rebuild left both disks MISSING
+PASS: shell is still alive
+PASS: RAID-0 cannot be rebuilt (no redundancy)
+PASS: bad disk numbers are rejected
+PASS: rebuild without a disk shows usage
+
+--- verify: detects problems, does not repair them ---
+PASS: verify before init is refused
+PASS: RAID-5: a healthy volume checks out
+PASS: RAID-5: healthy volume is CONSISTENT
+PASS: RAID-5: a normal read does NOT notice the corruption
+PASS: RAID-5: verify detects it
+PASS: RAID-5: verify names the damaged stripe
+PASS: verify says it does not repair
+PASS: RAID-5: a damaged parity block is detected too (stripe 3)
+PASS: RAID-5: verify with a failed disk explains what to do
+PASS: RAID-1: a healthy mirror checks out
+PASS: RAID-1: healthy mirror is CONSISTENT
+PASS: RAID-1: reads use Disk 1, so they do not see the damaged copy
+PASS: RAID-1: verify detects that the copies differ
+PASS: RAID-1: verify names the differing block
+PASS: RAID-0: verify says there is nothing to cross-check
+PASS: verify with extra arguments shows usage
+PASS: shell is still alive
+
+==============================================================
+ Passed: 103    Failed: 0
+==============================================================

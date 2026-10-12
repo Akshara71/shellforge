@@ -53,6 +53,16 @@ void disk_path(int disk_id, char *buf, size_t size);
 /* Create (or recreate) a disk file and write its header */
 int disk_create(int disk_id, uint32_t raid_level);
 
+/* Create a disk file of the right size that is all zeros and has NO valid
+ * header yet (it shows up as CORRUPT until disk_write_header() is called) */
+int disk_create_blank(int disk_id);
+
+/* Write the header of an existing disk file (this "activates" the disk) */
+int disk_write_header(int disk_id, uint32_t raid_level);
+
+/* Delete a disk file (used to simulate a failed disk) */
+int disk_remove(int disk_id);
+
 /* Read and validate a disk's header */
 int disk_read_header(int disk_id, DiskHeader *hdr);
 

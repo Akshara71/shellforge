@@ -3,7 +3,7 @@
  * disk.c - Virtual Disk Manager (FileGuard)
  *
  * All access to the virtual disk files goes through Linux system calls:
- * open, close, ftruncate, pread, pwrite.
+ * open, close, ftruncate, pread, pwrite, unlink.
  */
 #include <stdio.h>
 #include <string.h>
@@ -33,11 +33,9 @@ void disk_path(int disk_id, char *buf, size_t size)
     snprintf(buf, size, "%s/disk%d.img", g_data_dir, disk_id + 1);
 }
 
-int disk_create(int disk_id, uint32_t raid_level)
+int disk_create_blank(int disk_id)
 {
     char path[DISK_PATH_MAX];
-    unsigned char block[BLOCK_SIZE];
-    DiskHeader hdr;
     off_t total_size;
     int fd;
 
@@ -58,6 +56,23 @@ int disk_create(int disk_id, uint32_t raid_level)
         return DISK_ERR_IO;
     }
 
+    close(fd);
+    return DISK_OK;
+}
+
+int disk_write_header(int disk_id, uint32_t raid_level)
+{
+    char path[DISK_PATH_MAX];
+    unsigned char block[BLOCK_SIZE];
+    DiskHeader hdr;
+    ssize_t n;
+    int fd;
+
+    disk_path(disk_id, path, sizeof(path));
+    fd = open(path, O_WRONLY);
+    if (fd < 0)
+        return (errno == ENOENT) ? DISK_ERR_MISSING : DISK_ERR_IO;
+
     /* Fill in the header and place it in a full zero-padded block */
     hdr.magic       = DISK_MAGIC;
     hdr.version     = 2;
@@ -71,13 +86,27 @@ int disk_create(int disk_id, uint32_t raid_level)
     memcpy(block, &hdr, sizeof(hdr));
 
     /* pwrite() writes at an exact offset (0 = start of file) */
-    if (pwrite(fd, block, BLOCK_SIZE, 0) != BLOCK_SIZE) {
-        perror("pwrite header");
-        close(fd);
-        return DISK_ERR_IO;
-    }
-
+    n = pwrite(fd, block, BLOCK_SIZE, 0);
     close(fd);
+    return (n == BLOCK_SIZE) ? DISK_OK : DISK_ERR_IO;
+}
+
+int disk_create(int disk_id, uint32_t raid_level)
+{
+    int rc = disk_create_blank(disk_id);
+
+    if (rc != DISK_OK)
+        return rc;
+    return disk_write_header(disk_id, raid_level);
+}
+
+int disk_remove(int disk_id)
+{
+    char path[DISK_PATH_MAX];
+
+    disk_path(disk_id, path, sizeof(path));
+    if (unlink(path) != 0)
+        return (errno == ENOENT) ? DISK_ERR_MISSING : DISK_ERR_IO;
     return DISK_OK;
 }
 

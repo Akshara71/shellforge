@@ -11,6 +11,9 @@
  *   fileguard write <block> "text"      write text into a logical block
  *   fileguard read <block>              read a logical block back
  *   fileguard layout [block]            show where a logical block is stored
+ *   fileguard fail <disk>               simulate a disk failure   (recovery.c)
+ *   fileguard rebuild <disk>            rebuild + verify a disk   (recovery.c)
+ *   fileguard verify                    check copies / parity     (recovery.c)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +25,7 @@
 #include "fileguard.h"
 #include "disk.h"
 #include "volume.h"
+#include "recovery.h"
 
 static int g_paths_ready = 0;
 
@@ -64,6 +68,10 @@ static void print_usage(void)
     printf("  fileguard write <block> \"text\"   Write text to a logical block\n");
     printf("  fileguard read <block>           Read a logical block\n");
     printf("  fileguard layout [block]         Show where a block is stored\n");
+    printf("  fileguard fail <disk>            Simulate the failure of disk 1-%d\n",
+           NUM_DISKS);
+    printf("  fileguard rebuild <disk>         Rebuild a failed disk and verify it\n");
+    printf("  fileguard verify                 Check that copies/parity are consistent\n");
     printf("\nRAID-0 has %d logical blocks (0 to %d), RAID-1 has %d "
            "(0 to %d), RAID-5 has %d (0 to %d).\n",
            VOLUME_BLOCKS, VOLUME_BLOCKS - 1,
@@ -462,6 +470,9 @@ int fileguard_run(int argc, char *argv[])
     }
     if (strcmp(argv[1], "layout") == 0)
         return cmd_layout(argc, argv);
+    if (strcmp(argv[1], "fail") == 0 || strcmp(argv[1], "rebuild") == 0 ||
+        strcmp(argv[1], "verify") == 0)
+        return recovery_command(argc, argv);
 
     fprintf(stderr, "Unknown command: %s\n\n", argv[1]);
     print_usage();

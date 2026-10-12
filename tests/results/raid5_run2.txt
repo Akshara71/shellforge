@@ -1,0 +1,122 @@
+==============================================================
+ FileGuard RAID-5 (rotating parity) test run
+ Date    : Mon Oct 12 09:01:21 UTC 2026
+ Kernel  : 6.18.33.1-microsoft-standard-WSL2
+ GCC     : gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+ Binary  : /home/akshara/shellforge/shellforge
+==============================================================
+
+--- init raid5: headers and capacity ---
+PASS: init raid5 announces RAID-5 (rotating parity)
+PASS: init completes
+PASS: status shows the RAID-5 volume with 3072 blocks
+PASS: array state is HEALTHY
+PASS: status reports 4 of 4 disks online
+PASS: disk1.img is 524800 bytes
+PASS: disk1.img header: version 2 and RAID level 5
+PASS: disk2.img is 524800 bytes
+PASS: disk2.img header: version 2 and RAID level 5
+PASS: disk3.img is 524800 bytes
+PASS: disk3.img header: version 2 and RAID level 5
+PASS: disk4.img is 524800 bytes
+PASS: disk4.img header: version 2 and RAID level 5
+
+--- Block mapping and rotating parity (checked against the table) ---
+PASS: block 0: Disk 1, stripe 0, parity on Disk 4
+PASS: block 1: Disk 2, stripe 0, parity on Disk 4
+PASS: block 2: Disk 3, stripe 0, parity on Disk 4
+PASS: block 3: Disk 1, stripe 1, parity on Disk 3
+PASS: block 4: Disk 2, stripe 1, parity on Disk 3
+PASS: block 5: Disk 4, stripe 1, parity on Disk 3
+PASS: block 6: Disk 1, stripe 2, parity on Disk 2
+PASS: block 7: Disk 3, stripe 2, parity on Disk 2
+PASS: block 8: Disk 4, stripe 2, parity on Disk 2
+PASS: block 9: Disk 2, stripe 3, parity on Disk 1
+PASS: block 10: Disk 3, stripe 3, parity on Disk 1
+PASS: block 11: Disk 4, stripe 3, parity on Disk 1
+PASS: block 3071 (last): Disk 4, stripe 1023, parity on Disk 1
+
+--- Write and read back ---
+PASS: write reports the data disk and the parity disk
+PASS: all 14 test blocks read back exactly what was written
+
+--- Capacity is 3072 blocks ---
+PASS: 3 out-of-range accesses of block 3072 are rejected
+PASS: block 3071 is still readable
+
+--- Parity bytes on the disk images ---
+PASS: block 0 'A' is on Disk 1, stripe 0 (offset 512)
+PASS: stripe 0 parity (Disk 4) equals block 0 so far
+PASS: stripe 0 parity is now 'A' XOR 'B' = 03
+PASS: block 4 'AAAA' is on Disk 2, stripe 1 (offset 1024)
+PASS: stripe 1 parity (Disk 3) equals block 4 so far
+PASS: stripe 1 parity is now 'AAAA' XOR 'ZZZZ' = 1b
+
+--- Parity stays correct after many writes ---
+PASS: stripes 0-15 all have correct parity after 48 writes
+PASS: an untouched stripe (100) is consistent (all zero)
+PASS: parity is still correct after overwriting with shorter text
+
+--- One disk missing: every block is still readable and writable ---
+PASS: Disk 1 missing: array state is DEGRADED
+PASS: Disk 1 missing: all 12 blocks read back correctly
+PASS: Disk 1 missing: block 0 says it was rebuilt from parity
+PASS: Disk 1 missing: 12 blocks written while degraded read back correctly
+PASS: Disk 1 missing: write to its block is kept in the parity
+PASS: Disk 1 missing: write to a stripe whose parity was on it says so
+PASS: Disk 1 missing: writes carry the DEGRADED note
+PASS: Disk 1 missing: shell is still alive
+PASS: Disk 2 missing: array state is DEGRADED
+PASS: Disk 2 missing: all 12 blocks read back correctly
+PASS: Disk 2 missing: block 1 says it was rebuilt from parity
+PASS: Disk 2 missing: 12 blocks written while degraded read back correctly
+PASS: Disk 2 missing: write to its block is kept in the parity
+PASS: Disk 2 missing: write to a stripe whose parity was on it says so
+PASS: Disk 2 missing: writes carry the DEGRADED note
+PASS: Disk 2 missing: shell is still alive
+PASS: Disk 3 missing: array state is DEGRADED
+PASS: Disk 3 missing: all 12 blocks read back correctly
+PASS: Disk 3 missing: block 2 says it was rebuilt from parity
+PASS: Disk 3 missing: 12 blocks written while degraded read back correctly
+PASS: Disk 3 missing: write to its block is kept in the parity
+PASS: Disk 3 missing: write to a stripe whose parity was on it says so
+PASS: Disk 3 missing: writes carry the DEGRADED note
+PASS: Disk 3 missing: shell is still alive
+PASS: Disk 4 missing: array state is DEGRADED
+PASS: Disk 4 missing: all 12 blocks read back correctly
+PASS: Disk 4 missing: block 5 says it was rebuilt from parity
+PASS: Disk 4 missing: 12 blocks written while degraded read back correctly
+PASS: Disk 4 missing: write to its block is kept in the parity
+PASS: Disk 4 missing: write to a stripe whose parity was on it says so
+PASS: Disk 4 missing: writes carry the DEGRADED note
+PASS: Disk 4 missing: shell is still alive
+
+--- Independent check of the rebuild math (Disk 2 missing) ---
+PASS: XOR of the surviving disks equals the data on the lost Disk 2
+
+--- Two disks lost (RAID-5 cannot rebuild this) ---
+PASS: array state is FAILED
+PASS: a block on a surviving disk can still be read directly
+PASS: a block on a lost disk cannot be rebuilt, and says so
+PASS: writes are refused with two disks lost
+PASS: shell is still alive
+
+--- Disk 1 header damaged (CORRUPT counts as failed) ---
+PASS: damaged header is reported CORRUPT
+PASS: array state is DEGRADED
+PASS: the block on the damaged disk is rebuilt from parity
+PASS: read says it was rebuilt
+
+--- Persistence and switching RAID levels ---
+PASS: data written in one session is read in a new session
+PASS: the RAID level is remembered in a new session
+PASS: unknown RAID level is rejected
+PASS: extra init argument shows usage
+PASS: rejected init commands did not erase the data
+PASS: shell is still alive
+PASS: back in RAID-1 block 3071 is out of range
+PASS: plain 'init' still creates RAID-0 with 4096 blocks
+
+==============================================================
+ Passed: 89    Failed: 0
+==============================================================

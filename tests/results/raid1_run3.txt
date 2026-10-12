@@ -1,0 +1,102 @@
+==============================================================
+ FileGuard RAID-1 (mirror) test run
+ Date    : Mon Oct 12 09:00:59 UTC 2026
+ Kernel  : 6.18.33.1-microsoft-standard-WSL2
+ GCC     : gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+ Binary  : /home/akshara/shellforge/shellforge
+==============================================================
+
+--- init raid1: headers and capacity ---
+PASS: init raid1 announces RAID-1 (mirror)
+PASS: init completes
+PASS: status shows the RAID-1 volume with 1024 blocks
+PASS: mirror state is HEALTHY
+PASS: status reports 4 of 4 disks online
+PASS: disk1.img is 524800 bytes
+PASS: disk1.img header: version 2 and RAID level 1
+PASS: disk2.img is 524800 bytes
+PASS: disk2.img header: version 2 and RAID level 1
+PASS: disk3.img is 524800 bytes
+PASS: disk3.img header: version 2 and RAID level 1
+PASS: disk4.img is 524800 bytes
+PASS: disk4.img header: version 2 and RAID level 1
+
+--- Write and read back (every block exists twice) ---
+PASS: write reports both copies
+PASS: block 0 reads back exactly what was written
+PASS: block 1 reads back exactly what was written
+PASS: block 2 reads back exactly what was written
+PASS: block 3 reads back exactly what was written
+PASS: block 4 reads back exactly what was written
+PASS: block 5 reads back exactly what was written
+PASS: block 100 reads back exactly what was written
+PASS: block 1023 reads back exactly what was written
+
+--- Both copies are really on disk ---
+PASS: block 5 text is on Disk 1 (file offset 3072)
+PASS: block 5 text is on Disk 2 (file offset 3072)
+PASS: data areas of Disk 1 and Disk 2 are identical
+PASS: Disk 3 holds no data (unused)
+PASS: Disk 4 holds no data (unused)
+
+--- Capacity is 1024 blocks ---
+PASS: the last block (1023) can be written
+PASS: 4 out-of-range block numbers are rejected (1024, 2000)
+PASS: layout shows block 1023 on both mirror disks
+PASS: layout row for block 0
+PASS: layout row for block 3
+PASS: layout row for block 7
+
+--- Overwrite with shorter text clears both copies ---
+PASS: overwritten block reads back the new text
+PASS: Disk 1: old text fully cleared
+PASS: Disk 2: old text fully cleared
+PASS: copies still identical after the overwrite
+
+--- Disk 1 missing: volume keeps working (degraded) ---
+PASS: status marks the removed disk MISSING
+PASS: mirror state is DEGRADED
+PASS: block 0 is still readable from Disk 2
+PASS: block 1 is still readable from Disk 2
+PASS: read says it was served from Disk 2
+PASS: write while degraded reports one copy only
+PASS: data written while degraded can be read back
+PASS: data written while degraded is on Disk 2
+PASS: shell is still alive
+
+--- Disk 2 missing: volume keeps working (degraded) ---
+PASS: mirror state is DEGRADED
+PASS: old data is readable from Disk 1
+PASS: write reports Disk 1 only
+PASS: new data is readable from Disk 1
+
+--- Disk 1 header damaged (CORRUPT counts as failed) ---
+PASS: damaged header is reported CORRUPT
+PASS: mirror state is DEGRADED
+PASS: data is still readable
+PASS: read was served from Disk 2
+
+--- Both mirror disks lost ---
+PASS: mirror state is FAILED
+PASS: status counts 2 of 4 disks online
+PASS: read fails with a clear message
+PASS: write fails with a clear message
+PASS: shell is still alive
+
+--- Persistence across shell restarts ---
+PASS: data written in one session is read in a new session
+PASS: the RAID level is remembered in a new session
+
+--- Switching RAID levels and bad init arguments ---
+PASS: unknown RAID level is rejected
+PASS: extra init argument shows usage
+PASS: rejected init commands did not erase the data
+PASS: shell is still alive
+PASS: plain 'init' still creates RAID-0
+PASS: status shows the RAID-0 volume with 4096 blocks
+PASS: block 4095 works again in RAID-0
+PASS: back in RAID-1 block 4095 is out of range again
+
+==============================================================
+ Passed: 69    Failed: 0
+==============================================================
