@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 /*
- * disk.c - Virtual Disk Manager (FileGuard Core Module-I)
+ * disk.c - Virtual Disk Manager (FileGuard)
  *
  * All access to the virtual disk files goes through Linux system calls:
  * open, close, ftruncate, pread, pwrite.
@@ -33,7 +33,7 @@ void disk_path(int disk_id, char *buf, size_t size)
     snprintf(buf, size, "%s/disk%d.img", g_data_dir, disk_id + 1);
 }
 
-int disk_create(int disk_id)
+int disk_create(int disk_id, uint32_t raid_level)
 {
     char path[DISK_PATH_MAX];
     unsigned char block[BLOCK_SIZE];
@@ -60,11 +60,12 @@ int disk_create(int disk_id)
 
     /* Fill in the header and place it in a full zero-padded block */
     hdr.magic       = DISK_MAGIC;
-    hdr.version     = 1;
+    hdr.version     = 2;
     hdr.disk_id     = (uint32_t)disk_id;
     hdr.num_disks   = NUM_DISKS;
     hdr.block_size  = BLOCK_SIZE;
     hdr.data_blocks = DISK_DATA_BLOCKS;
+    hdr.raid_level  = raid_level;
 
     memset(block, 0, sizeof(block));
     memcpy(block, &hdr, sizeof(hdr));
@@ -101,6 +102,8 @@ int disk_read_header(int disk_id, DiskHeader *hdr)
     if (n != BLOCK_SIZE)
         return DISK_ERR_INVALID;
 
+    /* Old version-1 disks have zeros after their 24-byte header, so
+     * raid_level reads as 0 (RAID-0), which is exactly what they are. */
     memcpy(hdr, block, sizeof(DiskHeader));
     if (hdr->magic != DISK_MAGIC || hdr->disk_id != (uint32_t)disk_id)
         return DISK_ERR_INVALID;

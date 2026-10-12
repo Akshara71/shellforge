@@ -1,0 +1,85 @@
+==============================================================
+ FileGuard RAID-0 test run
+ Date    : Mon Oct 12 03:46:45 UTC 2026
+ Kernel  : 6.18.33.1-microsoft-standard-WSL2
+ GCC     : gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+ Binary  : /home/akshara/shellforge/shellforge
+==============================================================
+
+--- Before init ---
+PASS: status before init reports 0 of 4 disks online
+PASS: read before init fails with a clear message
+
+--- init and disk geometry ---
+PASS: init completes
+PASS: status reports 4 of 4 disks online
+PASS: disk1.img is 524800 bytes
+PASS: disk1.img starts with the FileGuard magic bytes
+PASS: disk2.img is 524800 bytes
+PASS: disk2.img starts with the FileGuard magic bytes
+PASS: disk3.img is 524800 bytes
+PASS: disk3.img starts with the FileGuard magic bytes
+PASS: disk4.img is 524800 bytes
+PASS: disk4.img starts with the FileGuard magic bytes
+
+--- Round trip: write, then read back ---
+PASS: block 0 reads back exactly what was written
+PASS: block 1 reads back exactly what was written
+PASS: block 2 reads back exactly what was written
+PASS: block 3 reads back exactly what was written
+PASS: block 4 reads back exactly what was written
+PASS: block 5 reads back exactly what was written
+PASS: block 6 reads back exactly what was written
+PASS: block 7 reads back exactly what was written
+PASS: block 100 reads back exactly what was written
+PASS: block 4095 reads back exactly what was written
+
+--- Logical block to disk mapping ---
+PASS: block 0 maps to Disk 1, disk block 0
+PASS: block 1 maps to Disk 2, disk block 0
+PASS: block 2 maps to Disk 3, disk block 0
+PASS: block 3 maps to Disk 4, disk block 0
+PASS: block 4 maps to Disk 1, disk block 1
+PASS: block 5 maps to Disk 2, disk block 1
+PASS: block 6 maps to Disk 3, disk block 1
+PASS: block 7 maps to Disk 4, disk block 1
+PASS: block 4095 maps to Disk 4, disk block 1023
+
+--- Bytes inside the disk image files ---
+PASS: block 0: 'ABC' plus end-of-string at disk1.img offset 512
+PASS: block 5: text at disk2.img offset 1024 (disk 2, disk block 1)
+PASS: block 4: text at disk1.img offset 1024 (striping wraps to disk 1)
+
+--- Overwrite with shorter text ---
+PASS: overwritten block reads back the new text
+PASS: old text is fully cleared (zero padding)
+
+--- Text length limits ---
+PASS: 511 characters are accepted
+PASS: 512 characters are rejected
+
+--- Invalid input (shell must stay alive) ---
+PASS: 4 bad block numbers are rejected (4096, -1, abc, write 4096)
+PASS: write without quotes shows usage
+PASS: read without a block shows usage
+PASS: unknown sub-command is reported
+PASS: plain 'fileguard' shows the usage text
+PASS: shell is still alive after all the errors
+
+--- Persistence across shell restarts ---
+PASS: data written in one session is read in a new session
+
+--- Missing disk (RAID-0 has no redundancy) ---
+PASS: status reports 3 of 4 disks online
+PASS: status marks the removed disk MISSING
+PASS: block on a surviving disk is still readable
+PASS: block on the missing disk gives a read error
+PASS: shell is still alive after the failed read
+
+--- Damaged disk header ---
+PASS: damaged header is reported CORRUPT
+PASS: status counts 3 of 4 disks online
+
+==============================================================
+ Passed: 52    Failed: 0
+==============================================================

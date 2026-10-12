@@ -1,9 +1,9 @@
 /*
- * disk.h - Virtual Disk Manager interface (FileGuard Core Module-I)
+ * disk.h - Virtual Disk Manager interface (FileGuard)
  *
  * A "virtual disk" is an ordinary file in the data folder.
  * Layout of every disk file:
- *   Block 0          : header (identifies the disk)
+ *   Block 0          : header (identifies the disk and the RAID level)
  *   Blocks 1..1024   : data blocks
  */
 #ifndef DISK_H
@@ -19,6 +19,10 @@
 #define DISK_PATH_MAX     512        /* size of path buffers             */
 #define DISK_MAGIC        0x46475244u /* identifies a FileGuard disk     */
 
+/* RAID level stored in every disk header (version 1 disks have 0 here) */
+#define RAID_LEVEL_0      0          /* striping                         */
+#define RAID_LEVEL_1      1          /* mirroring                        */
+
 /* Return codes used by the disk functions */
 #define DISK_OK            0
 #define DISK_ERR_MISSING  -1   /* disk file does not exist           */
@@ -28,11 +32,12 @@
 /* Header stored in block 0 of every disk file */
 typedef struct {
     uint32_t magic;        /* must equal DISK_MAGIC                  */
-    uint32_t version;      /* format version                         */
+    uint32_t version;      /* format version (2 = has raid_level)    */
     uint32_t disk_id;      /* 0-based disk number                    */
     uint32_t num_disks;    /* total disks in the array               */
     uint32_t block_size;   /* bytes per block                        */
     uint32_t data_blocks;  /* number of data blocks (excl. header)   */
+    uint32_t raid_level;   /* RAID_LEVEL_0 or RAID_LEVEL_1           */
 } DiskHeader;
 
 /* Choose the folder that holds the .img files (default: "data") */
@@ -45,7 +50,7 @@ const char *disk_get_data_dir(void);
 void disk_path(int disk_id, char *buf, size_t size);
 
 /* Create (or recreate) a disk file and write its header */
-int disk_create(int disk_id);
+int disk_create(int disk_id, uint32_t raid_level);
 
 /* Read and validate a disk's header */
 int disk_read_header(int disk_id, DiskHeader *hdr);
