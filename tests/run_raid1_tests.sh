@@ -242,11 +242,11 @@ check_has "the RAID level is remembered in a new session" \
 echo
 echo "--- Switching RAID levels and bad init arguments ---"
 run_sf "fileguard init raid1" "fileguard write 9 \"keep me\"" > /dev/null
-out=$(run_sf "fileguard init raid5" "fileguard init raid1 extra" \
+out=$(run_sf "fileguard init raid9" "fileguard init raid1 extra" \
              "fileguard read 9" "echo ALIVE-OK")
 check_has "unknown RAID level is rejected" \
-    "Error: unknown RAID level 'raid5' (use raid0 or raid1)" "$out"
-check_has "extra init argument shows usage" "Usage: fileguard init [raid0|raid1]" "$out"
+    "Error: unknown RAID level 'raid9' (use raid0, raid1 or raid5)" "$out"
+check_has "extra init argument shows usage" "Usage: fileguard init [raid0|raid1|raid5]" "$out"
 check_line "rejected init commands did not erase the data" "  keep me" "$out"
 check_line "shell is still alive" "ALIVE-OK" "$out"
 out=$(run_sf "fileguard init" "fileguard status" \

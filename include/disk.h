@@ -22,6 +22,7 @@
 /* RAID level stored in every disk header (version 1 disks have 0 here) */
 #define RAID_LEVEL_0      0          /* striping                         */
 #define RAID_LEVEL_1      1          /* mirroring                        */
+#define RAID_LEVEL_5      5          /* striping with rotating parity    */
 
 /* Return codes used by the disk functions */
 #define DISK_OK            0
@@ -37,7 +38,7 @@ typedef struct {
     uint32_t num_disks;    /* total disks in the array               */
     uint32_t block_size;   /* bytes per block                        */
     uint32_t data_blocks;  /* number of data blocks (excl. header)   */
-    uint32_t raid_level;   /* RAID_LEVEL_0 or RAID_LEVEL_1           */
+    uint32_t raid_level;   /* RAID_LEVEL_0, _1 or _5                 */
 } DiskHeader;
 
 /* Choose the folder that holds the .img files (default: "data") */

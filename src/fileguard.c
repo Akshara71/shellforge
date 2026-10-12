@@ -6,11 +6,11 @@
  * Shellforge shell can call it as a builtin command.
  *
  * Commands:
- *   fileguard init [raid0|raid1]    create the virtual disks (default raid0)
- *   fileguard status                show the state of every virtual disk
- *   fileguard write <block> "text"  write text into a logical block
- *   fileguard read <block>          read a logical block back
- *   fileguard layout [block]        show where a logical block is stored
+ *   fileguard init [raid0|raid1|raid5]  create the virtual disks (default raid0)
+ *   fileguard status                    show the state of every virtual disk
+ *   fileguard write <block> "text"      write text into a logical block
+ *   fileguard read <block>              read a logical block back
+ *   fileguard layout [block]            show where a logical block is stored
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,16 +58,17 @@ static void print_usage(void)
 {
     printf("FileGuard - user-space RAID-based virtual storage system\n\n");
     printf("Usage:\n");
-    printf("  fileguard init [raid0|raid1]     Create %d virtual disks "
+    printf("  fileguard init [raid0|raid1|raid5]  Create %d virtual disks "
            "(default: raid0)\n", NUM_DISKS);
     printf("  fileguard status                 Show the status of every disk\n");
     printf("  fileguard write <block> \"text\"   Write text to a logical block\n");
     printf("  fileguard read <block>           Read a logical block\n");
     printf("  fileguard layout [block]         Show where a block is stored\n");
     printf("\nRAID-0 has %d logical blocks (0 to %d), RAID-1 has %d "
-           "(0 to %d).\n",
+           "(0 to %d), RAID-5 has %d (0 to %d).\n",
            VOLUME_BLOCKS, VOLUME_BLOCKS - 1,
-           VOLUME_BLOCKS_RAID1, VOLUME_BLOCKS_RAID1 - 1);
+           VOLUME_BLOCKS_RAID1, VOLUME_BLOCKS_RAID1 - 1,
+           VOLUME_BLOCKS_RAID5, VOLUME_BLOCKS_RAID5 - 1);
 }
 
 /* Convert text to a logical block number (0..capacity-1). 0 = success. */
@@ -94,16 +95,45 @@ static void print_block_error(uint32_t capacity)
 
 static const char *level_name(int level)
 {
-    return (level == RAID_LEVEL_1) ? "RAID-1 (mirror)" : "RAID-0 (striping)";
+    if (level == RAID_LEVEL_1)
+        return "RAID-1 (mirror)";
+    if (level == RAID_LEVEL_5)
+        return "RAID-5 (rotating parity)";
+    return "RAID-0 (striping)";
+}
+
+static uint32_t level_capacity(int level)
+{
+    if (level == RAID_LEVEL_1)
+        return VOLUME_BLOCKS_RAID1;
+    if (level == RAID_LEVEL_5)
+        return VOLUME_BLOCKS_RAID5;
+    return VOLUME_BLOCKS;
 }
 
 static const char *disk_role(int level, int disk_id)
 {
     if (level == RAID_LEVEL_1)
         return (disk_id < MIRROR_COPIES) ? "mirror" : "unused";
+    if (level == RAID_LEVEL_5)
+        return "data+parity";
     if (level == RAID_LEVEL_0)
         return "stripe";
     return "-";
+}
+
+/* The 1-based number of the first failed disk, or 0 if none has failed */
+static int first_failed_disk(void)
+{
+    unsigned mask = 0;
+    int i;
+
+    volume_failed_disks(&mask);
+    for (i = 0; i < NUM_DISKS; i++) {
+        if (mask & (1u << i))
+            return i + 1;
+    }
+    return 0;
 }
 
 static int cmd_init(int argc, char *argv[])
@@ -113,7 +143,7 @@ static int cmd_init(int argc, char *argv[])
     int i;
 
     if (argc > 3) {
-        fprintf(stderr, "Usage: fileguard init [raid0|raid1]\n");
+        fprintf(stderr, "Usage: fileguard init [raid0|raid1|raid5]\n");
         return 1;
     }
     if (argc == 3) {
@@ -121,9 +151,11 @@ static int cmd_init(int argc, char *argv[])
             level = RAID_LEVEL_0;
         } else if (strcmp(argv[2], "raid1") == 0) {
             level = RAID_LEVEL_1;
+        } else if (strcmp(argv[2], "raid5") == 0) {
+            level = RAID_LEVEL_5;
         } else {
             fprintf(stderr, "Error: unknown RAID level '%s' "
-                            "(use raid0 or raid1)\n", argv[2]);
+                            "(use raid0, raid1 or raid5)\n", argv[2]);
             return 1;
         }
     }
@@ -148,12 +180,12 @@ static int cmd_init(int argc, char *argv[])
     if (level == RAID_LEVEL_1) {
         printf("Mirror: Disk 1 and Disk 2 hold identical copies; "
                "Disk 3 and Disk 4 are not used.\n");
-        printf("Volume capacity: %d logical blocks (%d bytes)\n",
-               VOLUME_BLOCKS_RAID1, VOLUME_BLOCKS_RAID1 * BLOCK_SIZE);
-    } else {
-        printf("Volume capacity: %d logical blocks (%d bytes)\n",
-               VOLUME_BLOCKS, VOLUME_BLOCKS * BLOCK_SIZE);
+    } else if (level == RAID_LEVEL_5) {
+        printf("Parity: every stripe has 3 data blocks and 1 parity block; "
+               "the parity block rotates across the 4 disks.\n");
     }
+    printf("Volume capacity: %u logical blocks (%u bytes)\n",
+           level_capacity(level), level_capacity(level) * BLOCK_SIZE);
     printf("Done. Run 'fileguard status' to check the disks.\n");
     return 0;
 }
@@ -221,13 +253,28 @@ static int cmd_status(void)
         else
             printf("Mirror state: FAILED (0 of %d copies available, "
                    "data unavailable)\n", MIRROR_COPIES);
+    } else if (level == RAID_LEVEL_5) {
+        printf("Volume: RAID-5 rotating parity over %d disks, "
+               "%d logical blocks (%d bytes)\n",
+               NUM_DISKS, VOLUME_BLOCKS_RAID5, VOLUME_BLOCKS_RAID5 * BLOCK_SIZE);
+        if (online == NUM_DISKS)
+            printf("Array state: HEALTHY (%d of %d disks available)\n",
+                   online, NUM_DISKS);
+        else if (online == NUM_DISKS - 1)
+            printf("Array state: DEGRADED (%d of %d disks available, "
+                   "no redundancy until the failed disk is replaced)\n",
+                   online, NUM_DISKS);
+        else
+            printf("Array state: FAILED (%d of %d disks available, "
+                   "more than one disk lost, data on failed disks "
+                   "unavailable)\n", online, NUM_DISKS);
     } else if (level == RAID_LEVEL_0) {
         printf("Volume: RAID-0 striping, %d logical blocks (%d bytes), "
                "no redundancy\n",
                VOLUME_BLOCKS, VOLUME_BLOCKS * BLOCK_SIZE);
     } else {
-        printf("Volume: not initialised "
-               "(run 'fileguard init' or 'fileguard init raid1')\n");
+        printf("Volume: not initialised (run 'fileguard init', "
+               "'fileguard init raid1' or 'fileguard init raid5')\n");
     }
     return 0;
 }
@@ -270,6 +317,25 @@ static int cmd_write(const char *block_text, const char *text)
                    "block %u (DEGRADED: Disk %d unavailable)\n",
                    len, lb, alive, disk_block, dead);
         }
+    } else if (level == RAID_LEVEL_5) {
+        int parity = volume_parity_disk(lb);
+        int data_ok = (mask >> disk_id) & 1u;
+        int parity_ok = (mask >> parity) & 1u;
+
+        if (data_ok && parity_ok)
+            printf("Wrote %zu bytes to logical block %u -> Disk %d, "
+                   "block %u (parity on Disk %d)\n",
+                   len, lb, disk_id + 1, disk_block, parity + 1);
+        else if (data_ok)
+            printf("Wrote %zu bytes to logical block %u -> Disk %d, "
+                   "block %u (parity not updated)\n",
+                   len, lb, disk_id + 1, disk_block);
+        else
+            printf("Wrote %zu bytes to logical block %u -> Disk %d "
+                   "unavailable, block %u kept in parity on Disk %d\n",
+                   len, lb, disk_id + 1, disk_block, parity + 1);
+        if (rc == VOLUME_DEGRADED)
+            printf("  (DEGRADED: Disk %d unavailable)\n", first_failed_disk());
     } else {
         printf("Wrote %zu bytes to logical block %u -> Disk %d, block %u\n",
                len, lb, disk_id + 1, disk_block);
@@ -282,12 +348,13 @@ static int cmd_read(const char *block_text)
     unsigned char buf[BLOCK_SIZE + 1];
     uint32_t capacity = volume_capacity();
     uint32_t lb, disk_block;
-    int disk_id, source = 0, rc;
+    int disk_id, source = 0, rc, level;
 
     if (parse_block(block_text, capacity, &lb) != 0) {
         print_block_error(capacity);
         return 1;
     }
+    level = volume_level();
     rc = volume_read(lb, buf, &source);
     if (rc != VOLUME_OK && rc != VOLUME_DEGRADED) {
         fprintf(stderr, "Error: read failed (run 'fileguard init' first?)\n");
@@ -302,20 +369,28 @@ static int cmd_read(const char *block_text)
         printf("  (empty block)\n");
     else
         printf("  %s\n", (char *)buf);
-    if (rc == VOLUME_DEGRADED)
-        printf("  (DEGRADED: Disk 1 unavailable, data served from Disk %d)\n",
-               source + 1);
+    if (rc == VOLUME_DEGRADED) {
+        if (level == RAID_LEVEL_5)
+            printf("  (DEGRADED: Disk %d unavailable, "
+                   "block rebuilt from parity)\n", source + 1);
+        else
+            printf("  (DEGRADED: Disk 1 unavailable, "
+                   "data served from Disk %d)\n", source + 1);
+    }
     return 0;
 }
 
-static void print_layout_row(uint32_t lb, int mirror)
+static void print_layout_row(uint32_t lb, int level)
 {
     uint32_t disk_block;
     int disk_id;
 
     volume_map(lb, &disk_id, &disk_block);
-    if (mirror)
+    if (level == RAID_LEVEL_1)
         printf("%13u   %-15s   %10u\n", lb, "Disk 1 + Disk 2", disk_block);
+    else if (level == RAID_LEVEL_5)
+        printf("%13u   Disk %d   %10u   Disk %d\n",
+               lb, disk_id + 1, disk_block, volume_parity_disk(lb) + 1);
     else
         printf("%13u   Disk %d   %10u\n", lb, disk_id + 1, disk_block);
 }
@@ -323,13 +398,18 @@ static void print_layout_row(uint32_t lb, int mirror)
 static int cmd_layout(int argc, char *argv[])
 {
     uint32_t capacity = volume_capacity();
-    int mirror = (volume_level() == RAID_LEVEL_1);
+    int level = volume_level();
     uint32_t lb, rows;
 
-    if (mirror) {
+    if (level == RAID_LEVEL_1) {
         printf("Logical block -> physical location "
                "(RAID-1 mirror, %u blocks)\n", capacity);
         printf("%13s   %-15s   %10s\n", "Logical block", "Disks", "Disk block");
+    } else if (level == RAID_LEVEL_5) {
+        printf("Logical block -> physical location "
+               "(RAID-5 rotating parity, %u blocks)\n", capacity);
+        printf("%13s   %-6s   %10s   %s\n",
+               "Logical block", "Disk", "Disk block", "Parity");
     } else {
         printf("Logical block -> physical location "
                "(RAID-0 striping, %u blocks)\n", capacity);
@@ -341,11 +421,14 @@ static int cmd_layout(int argc, char *argv[])
             print_block_error(capacity);
             return 1;
         }
-        print_layout_row(lb, mirror);
+        print_layout_row(lb, level);
     } else {
-        rows = (capacity < 8) ? capacity : 8;
+        /* RAID-5 shows 12 rows so one full rotation of the parity is visible */
+        rows = (level == RAID_LEVEL_5) ? 12 : 8;
+        if (capacity < rows)
+            rows = capacity;
         for (lb = 0; lb < rows; lb++)
-            print_layout_row(lb, mirror);
+            print_layout_row(lb, level);
     }
     return 0;
 }
