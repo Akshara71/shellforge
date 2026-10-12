@@ -14,4 +14,4 @@
 
 int recovery_command(int argc, char *argv[]);
 
-#endif /* RECOVERY_H */4
+#endif /* RECOVERY_H */
