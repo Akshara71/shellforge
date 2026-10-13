@@ -1,7 +1,7 @@
-FileGuard benchmark  Mon Oct 12 09:25:12 UTC 2026  blocks per test: 500 (512 bytes each)
+FileGuard benchmark  Tue Oct 13 04:20:32 UTC 2026  blocks per test: 500 (512 bytes each)
 Note: runs through the Shellforge shell, so parsing overhead is included.
 LEVEL        write(s)      read(s)
-raid0           0.049        0.035
-raid1           0.051        0.039
-raid5           0.057        0.041
-single          0.010        0.009   (raw single file, no shell)
+raid0           0.052        0.035
+raid1           0.053        0.034
+raid5           0.067        0.040
+single          0.009        0.009   (raw single file, no shell)
